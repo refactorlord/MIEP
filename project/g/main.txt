@@ -1,0 +1,87 @@
+from simulation import simulate_system, save_to_file
+from build_corridors import build_corridors
+from validate_in_corridors import validate
+from cross_validate import cross_validate
+import os
+import numpy as np
+import pandas as pd
+
+# Поддерживаемые типы звеньев
+SYSTEM_PAIRS = [
+    {
+        'type': 'aperiodic',
+        'name': 'Апериодическое',
+        'norm_params': {'T': 1},
+    },
+    {
+        'type': 'oscillatory',
+        'name': 'Колебательное',
+        'norm_params': {'T': 1, 'xi': 0.5},
+    },
+    {
+        'type': 'integrating',
+        'name': 'Интегрирующее',
+        'norm_params': {'k': 1},
+    }
+]
+
+# Ввод параметров пользователем
+base_T = float(input("Введите базовое значение T: "))
+start_T = float(input("Начальное значение T: "))
+end_T = float(input("Конечное значение T: "))
+step_T = float(input("Шаг изменения T: "))
+
+noise_levels_input = input("Уровни шума через пробел (например, 10 20 30): ")
+NOISE_LEVELS = list(map(int, noise_levels_input.split()))
+
+# Корректный диапазон T
+T_VALUES = []
+t = start_T
+while t <= end_T + 1e-6:
+    T_VALUES.append(round(t, 2))
+    t += step_T
+
+all_results = []
+
+for system_info in SYSTEM_PAIRS:
+    system_type = system_info['type']
+    system_name = system_info['name']
+    base_dir = os.path.join("results", system_type)
+    os.makedirs(base_dir, exist_ok=True)
+
+    for noise_level in NOISE_LEVELS:
+        print(f"\n{'=' * 60}\nОбработка: {system_name}, уровень шума={noise_level}%\n{'=' * 60}")
+
+        # Моделирование базового сигнала
+        simulations = simulate_system(
+            num_simulations=100,
+            system_type=system_type,
+            params=system_info['norm_params'],
+            noise_level=noise_level / 100
+        )
+
+        # Построение сигма-коридоров
+        corridor_path = os.path.join(base_dir, f"noise_{noise_level}")
+        corridor_data = build_corridors(simulations[:50], save_path=corridor_path, system_info=system_info)
+
+        # Валидация
+        val_result = validate(simulations[50:], corridor_data, save_path=os.path.join(corridor_path, "validation"))
+
+        # Кросс-валидация
+        cv_results = cross_validate(simulations[50:], corridor_data, T_VALUES, save_path=os.path.join(corridor_path, "cross_validation"))
+
+        all_results.extend([
+            {
+                'тип_звена': system_name,
+                'параметр': result['T'],
+                'уровень_шума': noise_level,
+                'в_1σ': result['avg_1sigma'],
+                'в_2σ': result['avg_2sigma'],
+                'в_3σ': result['avg_3sigma']
+            } for result in cv_results
+        ])
+
+# Сохраняем результаты
+df_summary = pd.DataFrame(all_results)
+df_summary.to_csv("results/cross_validation_summary.csv", index=False, encoding="utf-8-sig")
+print("\n✅ Все эксперименты завершены. Сводка сохранена в results/cross_validation_summary.csv")

@@ -1,0 +1,42 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import os
+
+def plot_heatmap(matrix, x_labels, y_labels, title, filename):
+    plt.figure(figsize=(10, 6))
+    sns.heatmap(matrix, annot=True, fmt=".1f", cmap="YlGnBu", xticklabels=x_labels, yticklabels=y_labels)
+    plt.title(title)
+    plt.xlabel("Тестовые значения T")
+    plt.ylabel("Уровень шума (%)")
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
+    print(f"Матрица сохранена: {filename}")
+
+
+def generate_cross_validation_heatmaps(df, save_dir="results/heatmaps"):
+    os.makedirs(save_dir, exist_ok=True)
+
+    types = df['тип_звена'].unique()
+    Ts = df['параметр'].unique()
+    noise_levels = df['уровень_шума'].unique()
+
+    for typ in types:
+        df_typ = df[df['тип_звена'] == typ]
+        matrix_1sigma = np.zeros((len(noise_levels), len(Ts)))
+        matrix_2sigma = np.zeros((len(noise_levels), len(Ts)))
+        matrix_3sigma = np.zeros((len(noise_levels), len(Ts)))
+
+        for i, noise in enumerate(noise_levels):
+            for j, T in enumerate(Ts):
+                row = df_typ[(df_typ['уровень_шума'] == noise) & (df_typ['параметр'] == T)]
+                if not row.empty:
+                    matrix_1sigma[i][j] = row.iloc[0]['мин_1σ']
+                    matrix_2sigma[i][j] = row.iloc[0]['мин_2σ']
+                    matrix_3sigma[i][j] = row.iloc[0]['мин_3σ']
+
+        plot_heatmap(matrix_1sigma, Ts, noise_levels, f"Тепловая карта: мин. процент точки внутри 1σ ({typ})", os.path.join(save_dir, f"{typ}_1sigma_min.png"))
+        plot_heatmap(matrix_2sigma, Ts, noise_levels, f"Тепловая карта: мин. процент точки внутри 2σ ({typ})", os.path.join(save_dir, f"{typ}_2sigma_min.png"))
+        plot_heatmap(matrix_3sigma, Ts, noise_levels, f"Тепловая карта: мин. процент точки внутри 3σ ({typ})", os.path.join(save_dir, f"{typ}_3sigma_min.png"))

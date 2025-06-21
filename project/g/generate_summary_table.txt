@@ -1,0 +1,57 @@
+import pandas as pd
+import os
+
+def generate_summary_table(results, filename="results/summary_table.csv"):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+    # Сгруппируем результаты по типу звена и уровню шума
+    grouped_results = {}
+    for result in results:
+        system_name = result['тип_звена']
+        noise_level = result['уровень_шума']
+        if system_name not in grouped_results:
+            grouped_results[system_name] = {}
+        if noise_level not in grouped_results[system_name]:
+            grouped_results[system_name][noise_level] = {
+                'min_1sigma': [],
+                'avg_1sigma': [],
+                'max_1sigma': [],
+                'min_2sigma': [],
+                'avg_2sigma': [],
+                'max_2sigma': [],
+                'min_3sigma': [],
+                'avg_3sigma': [],
+                'max_3sigma': []
+            }
+
+        grouped_results[system_name][noise_level]['min_1sigma'].append(result['мин_1σ'])
+        grouped_results[system_name][noise_level]['avg_1sigma'].append(result['ср_1σ'])
+        grouped_results[system_name][noise_level]['max_1sigma'].append(result['макс_1σ'])
+        grouped_results[system_name][noise_level]['min_2sigma'].append(result['мин_2σ'])
+        grouped_results[system_name][noise_level]['avg_2sigma'].append(result['ср_2σ'])
+        grouped_results[system_name][noise_level]['max_2sigma'].append(result['макс_2σ'])
+        grouped_results[system_name][noise_level]['min_3sigma'].append(result['мин_3σ'])
+        grouped_results[system_name][noise_level]['avg_3sigma'].append(result['ср_3σ'])
+        grouped_results[system_name][noise_level]['max_3sigma'].append(result['макс_3σ'])
+
+    # Создадим сводную таблицу
+    summary_data = []
+    for system_name, noise_levels in grouped_results.items():
+        for noise_level, metrics in noise_levels.items():
+            summary_data.append({
+                'тип_звена': system_name,
+                'уровень_шума': noise_level,
+                'мин_1σ': min(metrics['min_1sigma']),
+                'ср_1σ': sum(metrics['avg_1sigma']) / len(metrics['avg_1sigma']),
+                'макс_1σ': max(metrics['max_1sigma']),
+                'мин_2σ': min(metrics['min_2sigma']),
+                'ср_2σ': sum(metrics['avg_2sigma']) / len(metrics['avg_2sigma']),
+                'макс_2σ': max(metrics['max_2sigma']),
+                'мин_3σ': min(metrics['min_3sigma']),
+                'ср_3σ': sum(metrics['avg_3sigma']) / len(metrics['avg_3sigma']),
+                'макс_3σ': max(metrics['max_3sigma'])
+            })
+
+    df = pd.DataFrame(summary_data)
+    df.to_csv(filename, index=False, encoding="utf-8-sig")
+    print(f"Сводная таблица обновлена: {filename}")
